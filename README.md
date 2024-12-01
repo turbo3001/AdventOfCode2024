@@ -1,5 +1,5 @@
 # AdventOfCode2024
-Advent Of Code 2024 Progress
+Advent Of Code 2024 Progress  
 Day 1 [] []  
 Day 2 [] []  
 Day 3 [] []  
