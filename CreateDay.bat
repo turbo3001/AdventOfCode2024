@@ -1,4 +1,4 @@
-REM @echo off
+@echo off
 set FolderName=Day_%1
 set FolderPath=.\%FolderName%\
 if exist %FolderPath% (
