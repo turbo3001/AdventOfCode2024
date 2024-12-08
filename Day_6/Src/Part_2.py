@@ -1,5 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
-
 class Point:
     def __init__(self, x:int, y:int):
         self.x = x
@@ -44,7 +42,7 @@ class LoopPoint:
     def dirChar(self) -> str:
         return GuardDirChar[self.direction % len(GuardDirChar)]
     def loopDirChar(self) -> str:
-        return LoopDirChar[self.direction % len(LoopDirChar)]
+        return self.dirChar()#LoopDirChar[self.direction % len(LoopDirChar)]
     def __repr__(self):
         return f"{self.position} {self.dirChar()}"
     
@@ -68,6 +66,12 @@ def ParseInput(FileData:iter) -> tuple[list[str],Point]:
                 GuardPoint.y = y
     return (MapData, GuardPoint)
 
+def ListHasPoint(PointList:list[Point], PointToFind:Point) -> bool:
+    for CurrentPoint in PointList:
+        if CurrentPoint == PointToFind:
+            return True
+    return False
+
 def GetPointIndex(PointList:list[LoopPoint], PointToFind:Point|LoopPoint) -> int:
     listCopy = PointList.copy()
     listCopy.reverse()
@@ -88,13 +92,12 @@ def PrintMapSection(MapData:list[str], startPos:Point = Point(0,0), range:Point 
         MapRow = MapData[y]
         while x <= startPos.x + range.x and x < len(MapRow)-1:
             MapChar = MapRow[x]
-            pointIndex = GetPointIndex(WalkedPoints, Point(x, y))
             if(x == NewObstaclePos.x and y == NewObstaclePos.y):
                 printStr += "0"
             elif x == startPos.x and y == startPos.y:
                 printStr += dirChar
-            elif len(WalkedPoints) > 0 and pointIndex >= 0:
-                printStr += WalkedPoints[pointIndex].loopDirChar()
+            elif ListHasPoint(WalkedPoints, Point(x,y)):
+                printStr += "X"
             else:
                 printStr += MapChar
             x += 1
@@ -103,9 +106,36 @@ def PrintMapSection(MapData:list[str], startPos:Point = Point(0,0), range:Point 
         y += 1
     print(printStr)
 
+def GetGuardPath(MapData:list[str], GuardPos:Point) -> list[Point]:
+    WalkedPoints:list[Point] = [Point(GuardPos.x, GuardPos.y)]
+    currentGuardPos:Point = Point(GuardPos.x, GuardPos.y)
+    DirIndex:int = 0
+    while True:
+        currentDir = Dirs[DirIndex % len(Dirs)]
+        currentGuardPos += currentDir
+        if (currentGuardPos.y < 0 or
+            currentGuardPos.x < 0 or
+            currentGuardPos.y >= len(MapData) or
+            currentGuardPos.x >= len(MapData[currentGuardPos.y])
+            ):
+            print(f"Exited at {currentGuardPos}")
+            break
+
+        if MapData[currentGuardPos.y][currentGuardPos.x] == "#":
+            print(f"Hit wall at {currentGuardPos}")
+            currentGuardPos -= currentDir
+            DirIndex += 1
+            continue
+
+        if not ListHasPoint(WalkedPoints, currentGuardPos):
+            WalkedPoints.append(Point(currentGuardPos.x, currentGuardPos.y))
+
+    return WalkedPoints
+
 def PathLoops(MapData:list[str], GuardPos:Point, NewObstaclePos:Point) -> bool:
     print(NewObstaclePos)
-    WalkedPoints:list[LoopPoint] = []
+    WalkedPoints:list[Point] = []
+    LoopPoints:list[LoopPoint] = []
     currentGuardPos:Point = Point(GuardPos.x, GuardPos.y)
     DirIndex:int = 0
     FoundLoop:bool = False
@@ -126,40 +156,40 @@ def PathLoops(MapData:list[str], GuardPos:Point, NewObstaclePos:Point) -> bool:
             DirIndex = (DirIndex + 1) % len(Dirs)
             continue
         elif NewObstaclePos == currentGuardPos:
-            if len(WalkedPoints) == 0:
-                DirIndex = (DirIndex + 1) % len(Dirs)
-                WalkedPoints.append(LoopPoint(Point(currentGuardPos.x, currentGuardPos.y), DirIndex))
-                currentGuardPos -= currentDir
+            currentGuardPos -= currentDir
+            DirIndex = (DirIndex + 1) % len(Dirs)
+            if len(LoopPoints) == 0:
+                LoopPoints.append(LoopPoint(Point(currentGuardPos.x, currentGuardPos.y), DirIndex))
                 continue
-            loopPointIndex = GetPointIndex(WalkedPoints, LoopPoint(Point(currentGuardPos.x, currentGuardPos.y), DirIndex))
-            if loopPointIndex >= 0 and WalkedPoints[loopPointIndex].direction == DirIndex:
+        
+        if len(LoopPoints) > 0:
+            loopPointIndex = GetPointIndex(LoopPoints, LoopPoint(Point(currentGuardPos.x, currentGuardPos.y), DirIndex))
+            if loopPointIndex >= 0:
                 FoundLoop = True
                 break
+            LoopPoints.append(LoopPoint(Point(currentGuardPos.x, currentGuardPos.y), DirIndex))
 
+        WalkedPoints.append(Point(currentGuardPos.x, currentGuardPos.y))
         
-        if len(WalkedPoints) > 0:
-            WalkedPoints.append(LoopPoint(Point(currentGuardPos.x, currentGuardPos.y), DirIndex))
-        
-        #if(NewObstaclePos == Point(3,6)):
-            #PrintMapSection(MapData, currentGuardPos, range=Point(len(MapData[0]), len(MapData)), WalkedPoints=WalkedPoints, dirChar=DirChar[DirIndex], NewObstaclePos=NewObstaclePos)
+        # if(NewObstaclePos == Point(3,6)):
+        #     PrintMapSection(MapData, currentGuardPos, range=Point(len(MapData[0]), len(MapData)), WalkedPoints=WalkedPoints, dirChar=GuardDirChar[DirIndex], NewObstaclePos=NewObstaclePos)
+        #     input('Press any key for next frame')
         #PrintMapSection(MapData, currentGuardPos, range=Point(4,4), WalkedPoints=WalkedPoints, dirChar=DirChar[DirIndex % len(DirChar)])
-        #input('Press any key for next frame')
     
-    PrintMapSection(MapData, startPos=GuardPos, range=Point(len(MapData[0]), len(MapData)), WalkedPoints=WalkedPoints, NewObstaclePos=NewObstaclePos)
+    #PrintMapSection(MapData, startPos=GuardPos, range=Point(len(MapData[0]), len(MapData)), WalkedPoints=WalkedPoints, NewObstaclePos=NewObstaclePos)
     return FoundLoop
 
 def CountLoopingPaths(MapData:list[str], GuardPos:Point) -> int:
     count = 0
-    for y, MapRow in enumerate(MapData):
-        for x, MapChar in enumerate(MapRow):
-            if MapChar == "#" or MapChar == "^" or MapChar == "\n": #Skip existing obstacles and start pos
-                continue
-            if PathLoops(MapData, GuardPos, Point(x,y)):    
-                count += 1
+    GuardPath:list[Point] = GetGuardPath(MapData, GuardPos)
+    for Position in GuardPath[1:]:
+        #print(f'Checking {Position}')
+        if PathLoops(MapData, GuardPos, Position):
+            count += 1
     return count
 
 
 if __name__ == "__main__":
-    with open("./Day_6/InputData/Example.txt") as file:
+    with open("./Day_6/InputData/Input.txt") as file:
         InputData:tuple[list[str],Point] = ParseInput(file)
         print(CountLoopingPaths(InputData[0], InputData[1]))
